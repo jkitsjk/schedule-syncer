@@ -1,37 +1,47 @@
 import streamlit as st
-import json
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Schedule Syncer")
+st.set_page_config(page_title="🗓️ Schedule Syncer")
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+st.title("💖 Schedule Syncer")
+st.write("Find mutual free time between you and your boyfriend!")
 
-client_config = json.loads(st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
-REDIRECT_URI = st.secrets["REDIRECT_URI"]
+# Dummy "busy" events: [(start_datetime, end_datetime)]
+your_busy = [
+    (datetime(2025, 5, 6, 9), datetime(2025, 5, 6, 10)),
+    (datetime(2025, 5, 6, 12), datetime(2025, 5, 6, 13, 30)),
+    (datetime(2025, 5, 6, 15), datetime(2025, 5, 6, 16)),
+]
 
-# Auth flow
-query_params = st.query_params
-code = query_params.get("code", [None])[0]
+bf_busy = [
+    (datetime(2025, 5, 6, 10), datetime(2025, 5, 6, 11)),
+    (datetime(2025, 5, 6, 13), datetime(2025, 5, 6, 14)),
+    (datetime(2025, 5, 6, 16), datetime(2025, 5, 6, 17)),
+]
 
-if code:
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=st.secrets["REDIRECT_URI"])
-    flow.fetch_token(code=code)
-    credentials = flow.credentials
-    service = build('calendar', 'v3', credentials=credentials)
+def find_free_slots(yours, his, start, end):
+    all_busy = sorted(yours + his, key=lambda x: x[0])
+    free_slots = []
+    current = start
 
-    now = datetime.utcnow().isoformat() + "Z"
-    end = (datetime.utcnow() + timedelta(days=1)).isoformat() + "Z"
-    events = service.events().list(calendarId='primary', timeMin=now, timeMax=end, singleEvents=True, orderBy='startTime').execute()
-    
-    st.success("✅ Calendar connected!")
-    st.write("Your events today:")
-    for event in events.get('items', []):
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        st.write(f"• {start}: {event['summary']}")
+    for b_start, b_end in all_busy:
+        if current < b_start:
+            free_slots.append((current, b_start))
+        current = max(current, b_end)
+
+    if current < end:
+        free_slots.append((current, end))
+
+    return free_slots
+
+day_start = datetime(2025, 5, 6, 9)
+day_end = datetime(2025, 5, 6, 18)
+
+free_slots = find_free_slots(your_busy, bf_busy, day_start, day_end)
+
+st.subheader("✅ Common Free Time:")
+if free_slots:
+    for start, end in free_slots:
+        st.write(f"🕒 {start.strftime('%H:%M')} - {end.strftime('%H:%M')}")
 else:
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=st.secrets["REDIRECT_URI"])
-    auth_url, _ = flow.authorization_url(prompt='consent')
-    st.write("🔐 Click below to connect your Google Calendar:")
-    st.markdown(f"[Connect Google Calendar]({auth_url})")
+    st.error("No common free time today! 😢")
