@@ -16,7 +16,7 @@ query_params = st.query_params
 code = query_params.get("code", [None])[0]
 
 if code:
-    flow = Flow.from_client_config(client_config["web"], scopes=SCOPES, redirect_uri=REDIRECT_URI)
+    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=st.secrets["REDIRECT_URI"])
     flow.fetch_token(code=code)
     credentials = flow.credentials
     service = build('calendar', 'v3', credentials=credentials)
@@ -31,7 +31,7 @@ if code:
         start = event['start'].get('dateTime', event['start'].get('date'))
         st.write(f"• {start}: {event['summary']}")
 else:
-    flow = Flow.from_client_config(client_config["web"], scopes=SCOPES, redirect_uri=REDIRECT_URI)
+    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=st.secrets["REDIRECT_URI"])
     auth_url, _ = flow.authorization_url(prompt='consent')
     st.write("🔐 Click below to connect your Google Calendar:")
     st.markdown(f"[Connect Google Calendar]({auth_url})")
