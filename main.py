@@ -8,14 +8,15 @@ from googleapiclient.discovery import build
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
-# Load credentials from Streamlit secret
+# Load credentials from Streamlit secrets
 client_config = json.loads(st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
+REDIRECT_URI = st.secrets["REDIRECT_URI"]
 
 def authenticate():
     flow = Flow.from_client_config(
         client_config=client_config,
         scopes=SCOPES,
-        redirect_uri=st.secrets["REDIRECT_URI"]
+        redirect_uri=REDIRECT_URI
     )
     auth_url, _ = flow.authorization_url(prompt='consent')
     return flow, auth_url
@@ -29,8 +30,10 @@ def get_calendar_service(flow, code):
 def get_events(service):
     now = datetime.utcnow().isoformat() + 'Z'
     end = (datetime.utcnow() + timedelta(days=1)).isoformat() + 'Z'
-    events_result = service.events().list(calendarId='primary', timeMin=now, timeMax=end,
-                                          singleEvents=True, orderBy='startTime').execute()
+    events_result = service.events().list(
+        calendarId='primary', timeMin=now, timeMax=end,
+        singleEvents=True, orderBy='startTime'
+    ).execute()
     return events_result.get('items', [])
 
 def parse_events(events):
@@ -60,22 +63,22 @@ def find_free_slots(your_busy, bf_busy):
 
     return free_slots
 
-# UI
+# -------- Streamlit UI --------
 st.title("💞 Schedule Syncer")
 st.write("Find mutual free time between you and your boyfriend!")
 
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 code = query_params.get("code", [None])[0]
 
 if code:
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=st.secrets["REDIRECT_URI"])
+    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=REDIRECT_URI)
     flow.fetch_token(code=code)
     service = build("calendar", "v3", credentials=flow.credentials)
 
     events = get_events(service)
     your_busy = parse_events(events)
 
-    # Dummy boyfriend calendar data
+    # Dummy boyfriend calendar
     bf_busy = [
         ('2025-05-03T10:00:00', '2025-05-03T11:30:00'),
         ('2025-05-03T15:00:00', '2025-05-03T17:00:00')
